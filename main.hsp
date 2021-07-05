@@ -1,0 +1,233 @@
+/*------------------------------------------------
+
+			　　　　猪突猛進
+
+	        (C) YotioSoft 2018 - 2019
+
+------------------------------------------------*/
+
+#uselib "user32.dll"
+	#func DrawText "DrawTextW" int,wstr,int,int,int
+		
+#module
+/*文字を中央に表示（使用例：cmes "hogehoge", 0, 640, 0, 480, 0）*/
+#deffunc cmes str ctext, int cx, int cy, int cx2, int cy2, int redraw_exist
+	RECT = cx, cy, cx2, cy2
+	DrawText@ hdc, ctext, -1, varptr(RECT), $01
+	if redraw_exist = 0 : redraw 1
+	return
+
+/*半透明色表示命令（機能はboxfaと同じ）*/
+#deffunc sboxf int depth, int ax, int ay, int bx, int by
+	pdx = ax, bx, bx, ax
+	pdy = ay, ay, by, by
+	gmode 3,,,depth
+	gsquare -1,pdx, pdy
+	return
+		
+#global
+
+*start 
+	celload "img/inoshishi.png", 1
+	celload "img/osu.png", 2
+	celload "img/kumo.png", 3
+	celload "img/logo.png", 4
+	
+	scx = 640 : scy = 480
+	
+	screen 0, scx, scy
+	
+	randomize
+
+	title "猪突猛進"
+
+*menu
+	color 0, 162, 232 : boxf
+	pos 0, 0 : gcopy 4, 0, 0, 640, 300
+
+	objsize 100, 20
+	pos scx/2-110, 410 : button gosub "遊び方", *howto
+	pos scx/2+10, 410 : button "はじめる", *main
+
+	gmode 2
+	repeat
+		redraw 0
+
+		color 0, 162, 232 : boxf 0, 270, scx, scy
+		
+		pos scx/2-100+10+70-20, 270
+		if cnt \ 2 = 0 {
+			gcopy 1, 0, 0, 100, 100
+		} else {
+			gcopy 1, 0, 100, 100, 100
+		}
+
+		redraw 1
+		wait 10
+	loop
+
+	stop
+
+*howto
+	dialog "概要：\nスペースキーを連打して、イノシシを止めてください\n\n崖に落ちるまでに止められないと、ゲームオーバーです。", , "遊び方"
+	return
+	
+*main
+	clrobj
+	
+	dim cloudPosition, 10, 2
+	repeat 10
+		cloudPosition(cnt, 0) = -rnd(1000)
+		cloudPosition(cnt, 1) = rnd(100)
+	loop
+	
+	waitTime = 0
+	inoshishiPower = 10.0
+	playerPower = 10.0
+
+	cliffPositionX = -1000
+	
+	repeat
+		powerGaugeLeft  = playerPower    / (playerPower+inoshishiPower)
+		powerGaugeRight = inoshishiPower / (playerPower+inoshishiPower)
+	
+		if cnt \ (powerGaugeLeft*30) and powerGaudeLeft < 100 {
+			inoshishiPower ++
+			playerPower --
+		}
+	
+		getkey keySpace, 32
+		if keySpace = 1 {
+			inoshishiPower --
+			playerPower ++
+		}
+	
+		if powerGaugeLeft < 0.0 {
+			powerGaugeLeft = 0.0
+		}
+		if powerGaugeRight < 0.0 {
+			powerGaugeRight = 0.0
+		}
+	
+		if powerGaugeLeft > 1.0 {
+			powerGaugeLeft = 1.0  
+		}
+		if powerGaugeRight > 1.0 {
+			powerGaugeRight = 1.0
+		}
+	
+		waitTime = 10.0 - powerGaugeRight*1000
+		if waitTime <= 0.0 {
+			waitTime = 1.0
+	 	}
+	 	
+		if cnt \ waitTime = 0 {
+			gosub *drow
+		}
+	
+		if powerGaugeLeft >= 1.00 {
+			gosub *drow
+			wait 100
+			rslt = 1
+			break
+		}
+
+		if cliffPositionX >= scx/2-30 {
+			gosub *drow
+			wait 100
+			gosub *fallOut
+			rslt = 0
+			break
+		}
+
+		cliffPositionX += 10
+		
+		await 10
+	loop
+
+	goto *result
+
+	stop
+
+*drow
+	redraw 0
+		
+	/*背景*/
+	gmode 2
+
+	if cliffPositionX < 0 {
+		cliffPositionXTemp = 0
+	} else {
+		cliffPositionXTemp = cliffPositionX
+	}
+		
+	color 0, 162, 232 : boxf
+	color 185, 122, 78 : boxf cliffPositionXTemp, 300, scx, scy
+	
+	repeat 10
+		pos cloudPosition(cnt, 0), cloudPosition(cnt, 1) : gcopy 3, 0, 0, 100, 100
+
+		cloudPosition(cnt, 0) += 10
+
+		if cloudPosition(cnt, 0) > scx {
+			cloudPosition(cnt, 0) = -rnd(1000)
+			cloudPosition(cnt, 1) = rnd(100)
+		}
+	loop
+	
+	/*パワーゲージ*/
+	color 34, 177, 76 : boxf scx/2-50, 10, scx/2-50+powerGaugeLeft*100, 15
+	color 237, 28, 36 : boxf scx/2-50+powerGaugeLeft*100, 10, scx/2+50, 15
+	
+	pos scx/2-100+10+70-20, 200
+	if i \ 2 = 0 {
+		gcopy 1, 0, 0, 100, 100
+	} else {
+		gcopy 1, 0, 100, 100, 100
+	}
+	i++
+	pos scx/2-100+10+10, 200 : gcopy 2, 0, 0, 70, 100
+	
+	redraw 1
+
+	return
+
+*fallOut
+	y = 200
+	while y < scy+100
+		redraw 0
+		
+		color 0, 162, 232 : boxf scx/2-100+10+10, 200, scx/2-100+10+10+70, scy : boxf scx/2-100+10+10, 200, scx, 300
+		color 185, 122, 78 : boxf cliffPositionXTemp, 300, scx, scy
+		pos scx/2-100+10+70-20, 200
+		if i \ 2 = 0 {
+			gcopy 1, 0, 0, 100, 100
+		} else {
+			gcopy 1, 0, 100, 100, 100
+		}
+		
+		pos scx/2-100+10+10, y : gcopy 2, 0, 0, 70, 100
+		y+10
+
+		redraw 1
+		wait 1
+	wend
+
+	return
+
+*result
+	color 0, 0, 0 : sboxf 128, 0, 0, scx, scy
+	color 255, 255, 255 : font "Meiryo", 28
+	
+	if rslt = 0 {
+		cmes "You Lose...", 0, 200, scx, 230
+	} else {
+		cmes "You Win!", 0, 200, scx, 230
+		font "Meiryo", 14
+		cmes ""+(cliffPositionX+1000)+"m", 0, 240, scx, 260
+	}
+
+	objsize 100, 20
+	pos scx/2-50, 300 : button "Again?", *main
+
+	stop
